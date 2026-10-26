@@ -1,6 +1,7 @@
 import { View, StyleSheet } from "react-native";
 import NavigationTab from "./NavigationTab";
 import { navigationContentArray } from "../utilities/navitationArrayTab";
+import { colorStyle } from "../styles/Colors";
 
 function NavigationBar({ state, descriptors, navigation }) {
     return (
@@ -40,11 +41,14 @@ export default NavigationBar;
 
 const styles = StyleSheet.create({
     container: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        paddingBottom: 0,
     },
     navigationBar: {
-        backgroundColor: '#fff',
+        backgroundColor: colorStyle.bgDark,
         height: 135,
         width: 320,
         paddingHorizontal: 24,

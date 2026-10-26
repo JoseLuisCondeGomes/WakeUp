@@ -1,8 +1,9 @@
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { colorStyle } from '../styles/Colors';
 
-export default function FoodTab({ data }) {
+export default function FoodTab({ data, onPress }) {
     return (
-        <View style={styles.foodTab}>
+        <TouchableOpacity style={styles.foodTab} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.header}>
                 <Text style={styles.foodName}>{data.food_name}</Text>
                 <Text style={styles.kcal}>{data.kcal} kcal</Text>
@@ -21,13 +22,13 @@ export default function FoodTab({ data }) {
                     <Text style={styles.macroLabel}>Carbs</Text>
                 </View>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     foodTab: {
-        backgroundColor: '#fff',
+        backgroundColor: colorStyle.bgDark,
         borderRadius: 16,
         padding: 16,
         marginTop: 10,
@@ -46,12 +47,12 @@ const styles = StyleSheet.create({
     foodName: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
+        color: colorStyle.textPrimary,
     },
     kcal: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#e67e22',
+        color: colorStyle.mainGradient[0],
     },
     macros: {
         flexDirection: 'row',
@@ -63,11 +64,11 @@ const styles = StyleSheet.create({
     macroValue: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#555',
+        color: colorStyle.textSecondary,
     },
     macroLabel: {
         fontSize: 11,
-        color: '#999',
+        color: colorStyle.textInactive,
         marginTop: 2,
     },
 });

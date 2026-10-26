@@ -2,11 +2,11 @@ import { useContext, useEffect, useState } from "react";
 import {
     StyleSheet, TouchableOpacity, Text, View,
     Keyboard, TouchableWithoutFeedback, ScrollView,
-    ActivityIndicator,
-    Dimensions
+    ActivityIndicator, Dimensions
 } from "react-native";
 import InputField from "../InputField";
 import * as apiService from "./../../services/exerciseService";
+import * as presetService from "./../../services/exercisePresetService";
 import { User } from '../../contexts/UserContext';
 import { colorStyle } from "../../styles/Colors";
 
@@ -25,10 +25,12 @@ const INITIAL_STATE = {
 };
 
 export default function AddCardioForm({ date, onClose }) {
-    const { user, token } = useContext(User);
+    const { user, token, isGuest } = useContext(User);
     const [exerciseData, setExerciseData] = useState(INITIAL_STATE);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [presets, setPresets] = useState([]);
+    const [loadingPresets, setLoadingPresets] = useState(true);
 
     function handleInputChange(fieldName, value) {
         setExerciseData(prev => ({ ...prev, [fieldName]: value }));
@@ -43,6 +45,10 @@ export default function AddCardioForm({ date, onClose }) {
         setErrorMessage("");
     }
 
+    function handlePresetSelect(preset) {
+        handleInputChange("exerciseName", preset.exercise_name);
+    }
+
     async function submitForm() {
         if (!exerciseData.exerciseName.trim()) {
             setErrorMessage("Exercise name is required");
@@ -52,7 +58,7 @@ export default function AddCardioForm({ date, onClose }) {
         setIsLoading(true);
         setErrorMessage("");
         try {
-            await apiService.addCardioExercise(exerciseData, token);
+            await apiService.addCardioExercise(exerciseData, token, isGuest);
             setExerciseData(INITIAL_STATE);
             onClose();
         } catch (error) {
@@ -66,6 +72,10 @@ export default function AddCardioForm({ date, onClose }) {
     useEffect(() => {
         handleInputChange("exerciseDate", date.format('DD-MM-YYYY'));
         handleInputChange("exerciseUser", user.uuidUser);
+        presetService.getPresets("cardio", null, token, isGuest)
+            .then(setPresets)
+            .catch(() => setPresets([]))
+            .finally(() => setLoadingPresets(false));
     }, []);
 
     return (
@@ -76,13 +86,40 @@ export default function AddCardioForm({ date, onClose }) {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.container}>
-                    <View style={styles.sectionCard}>
+                    {loadingPresets ? (
+                        <ActivityIndicator size="small" color={colorStyle.mainGradient[0]} />
+                    ) : presets.length > 0 ? (
+                        <View style={styles.sectionCard}>
+                            <Text style={styles.sectionLabel}>Quick select</Text>
+                            <View style={styles.presetRow}>
+                                {presets.map((preset) => (
+                                    <TouchableOpacity
+                                        key={preset.uuid_exercise_preset}
+                                        style={[
+                                            styles.presetChip,
+                                            exerciseData.exerciseName === preset.exercise_name && styles.presetChipActive
+                                        ]}
+                                        onPress={() => handlePresetSelect(preset)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[
+                                            styles.presetChipText,
+                                            exerciseData.exerciseName === preset.exercise_name && styles.presetChipTextActive
+                                        ]}>{preset.exercise_name}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    ) : null}
+
+                    <View style={styles.sectionCardname}>
                         <Text style={styles.sectionLabel}>Exercise name</Text>
                         <InputField
                             label=""
                             value={exerciseData.exerciseName}
                             onChangeText={(text) => handleInputChange("exerciseName", text)}
                             keyboardType="text-pad"
+                            containerStyle={styles.exerciseNameInput}
                         />
                     </View>
 
@@ -157,7 +194,7 @@ export default function AddCardioForm({ date, onClose }) {
                         disabled={isLoading}
                     >
                         {isLoading ? (
-                            <ActivityIndicator color="#fff" size="small" />
+                            <ActivityIndicator color={colorStyle.textPrimary} size="small" />
                         ) : (
                             <Text style={styles.saveButtonText}>Save</Text>
                         )}
@@ -172,16 +209,16 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingBottom: 20,
-        width: width
+        width: "100%"
     },
     container: {
-        width: '95%',
+        width: '100%',
         alignSelf: 'center',
         paddingTop: 8,
     },
     sectionCard: {
-        width: '90%',
-        backgroundColor: '#fff',
+        width: '100%',
+        backgroundColor: colorStyle.bgCard,
         borderRadius: 16,
         padding: 16,
         marginBottom: 12,
@@ -190,16 +227,43 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
-        alignItems: 'center',
+        alignSelf: 'center',
     },
     sectionLabel: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#aaa',
+        color: colorStyle.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 1,
         marginBottom: 10,
         alignSelf: 'flex-start',
+    },
+    presetRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    presetChip: {
+        backgroundColor: colorStyle.mainGradient[0] + '25',
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colorStyle.mainGradient[0] + '40',
+    },
+    presetChipActive: {
+        backgroundColor: colorStyle.mainGradient[0],
+        borderColor: colorStyle.mainGradient[0],
+    },
+    presetChipText: {
+        color: colorStyle.textPrimary,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    presetChipTextActive: {
+        color: colorStyle.textPrimary,
+        fontWeight: '700',
     },
     row: {
         flexDirection: 'row',
@@ -213,7 +277,7 @@ const styles = StyleSheet.create({
     colon: {
         fontSize: 22,
         fontWeight: '700',
-        color: '#ccc',
+        color: colorStyle.textInactive,
         marginHorizontal: 4,
     },
     metricField: {
@@ -223,24 +287,28 @@ const styles = StyleSheet.create({
     metricSpacer: {
         width: 12,
     },
+    exerciseNameInput: {
+        width: '100%',
+    },
     errorText: {
-        color: '#d32f2f',
+        color: colorStyle.error,
         fontSize: 14,
         marginTop: 4,
         marginBottom: 8,
         textAlign: 'center',
     },
     saveButton: {
-        width: '90%',
-        height: 52,
+        width: 150,
+        height: 50,
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 8,
+        alignSelf: 'center',
     },
     saveButtonText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: colorStyle.textPrimary,
     },
 });

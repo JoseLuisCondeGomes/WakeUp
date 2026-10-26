@@ -8,7 +8,7 @@ import { addFood } from "../../services/FoodService";
 const { height } = Dimensions.get('window');
 
 export default function AddFoodDataModal({ date, onClose }) {
-    const { user, token } = useContext(User);
+    const { user, token, isGuest } = useContext(User);
     const [isLoading, setIsLoading] = useState(false);
     const [foodRecordedData, setFoodRecordedData] = useState({
         nameOrIngredients: "",
@@ -37,7 +37,7 @@ export default function AddFoodDataModal({ date, onClose }) {
         };
 
         try {
-            await addFood(foodData, token);
+            await addFood(foodData, token, isGuest);
             onClose();
         } catch (error) {
             console.error(error);
@@ -97,7 +97,7 @@ export default function AddFoodDataModal({ date, onClose }) {
                 disabled={isLoading}
             >
                 {isLoading ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colorStyle.textPrimary} size="small" />
                 ) : (
                     <Text style={styles.saveButtonText}>Save</Text>
                 )}
@@ -132,6 +132,6 @@ const styles = StyleSheet.create({
     saveButtonText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: colorStyle.textPrimary,
     },
 });

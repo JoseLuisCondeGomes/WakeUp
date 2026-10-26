@@ -9,16 +9,33 @@ const apiRoutes = {
     exercise: {
         cardio: {
             addExercise: "/record-cardio-exercise",
-            getCardioExercisesInDate: "/cardio-exercises/"
+            getCardioExercisesInDate: "/cardio-exercises/",
+            updateCardioExercise: "/update-cardio-exercise/",
+            deleteCardioExercise: "/delete-cardio-exercise/"
         },
         strength: {
             addExercise: "/record-strength-exercise",
-            getStrengthExercisesInDate: "/strength-exercises/"
+            getStrengthExercisesInDate: "/strength-exercises/",
+            getExerciseSets: "/strength-exercise-sets/",
+            updateExerciseSet: "/update-exercise-set/",
+            deleteExerciseSet: "/delete-exercise-set/",
+            deleteStrengthExercise: "/delete-strength-exercise/"
         }
     },
     feeding: {
         addFood: "/record-food",
-        getFoods: "/user-feeding/"
+        getFoods: "/user-feeding/",
+        updateFood: "/update-food/",
+        deleteFood: "/delete-food/"
+    },
+    cathegory: {
+        addCathegory: "/add-cathegory",
+        getCathegories: "/cathegories",
+        deleteCathegory: "/delete-cathegory/"
+    },
+    exercisePresets: "/exercise-presets",
+    activity: {
+        getMonthlyActivity: "/monthly-activity/"
     }
 }
 

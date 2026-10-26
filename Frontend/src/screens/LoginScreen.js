@@ -1,5 +1,5 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Pressable, ActivityIndicator, Keyboard, Dimensions } from 'react-native';
+import React, { useContext, useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Pressable, ActivityIndicator, Keyboard, Animated } from 'react-native';
 import InputField from '../components/InputField';
 import * as apiService from "./../services/authService"
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,11 +7,10 @@ import { textStyle } from '../styles/TextStyles';
 import { User } from '../contexts/UserContext';
 import { colorStyle } from '../styles/Colors';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-
-const { height } = Dimensions.get('window');
+import { defaultBRadius } from '../styles/DefaultVaules';
 
 const LoginScreen = ({ navigation }) => {
-	const { user, setUser } = useContext(User);
+	const { user, setUser, enterGuestMode } = useContext(User);
 	const [userToLogIn, setUserToLogIn] = useState({
 		userLoginData: "",
 		userPassword: ""
@@ -19,6 +18,55 @@ const LoginScreen = ({ navigation }) => {
 	const [errors, setErrors] = useState({});
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
+
+	const loginScaleAnim = useRef(new Animated.Value(1)).current;
+	const registerScaleAnim = useRef(new Animated.Value(1)).current;
+	const guestScaleAnim = useRef(new Animated.Value(1)).current;
+
+	const handleLoginPressIn = () => {
+		Animated.spring(loginScaleAnim, {
+			toValue: 0.95,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleLoginPressOut = () => {
+		Animated.spring(loginScaleAnim, {
+			toValue: 1,
+			friction: 3,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleRegisterPressIn = () => {
+		Animated.spring(registerScaleAnim, {
+			toValue: 0.95,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleRegisterPressOut = () => {
+		Animated.spring(registerScaleAnim, {
+			toValue: 1,
+			friction: 3,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleGuestPressIn = () => {
+		Animated.spring(guestScaleAnim, {
+			toValue: 0.95,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleGuestPressOut = () => {
+		Animated.spring(guestScaleAnim, {
+			toValue: 1,
+			friction: 3,
+			useNativeDriver: true,
+		}).start();
+	};
 
 	function handleInputChange(fieldName, value) {
 		setUserToLogIn(prevState => ({
@@ -63,6 +111,10 @@ const LoginScreen = ({ navigation }) => {
 		navigation.navigate('Register');
 	}
 
+	function handleGuest() {
+		enterGuestMode();
+	}
+
 	useEffect(() => {
 		if (user != null) {
 			navigation.navigate('MainTabs');
@@ -73,20 +125,20 @@ const LoginScreen = ({ navigation }) => {
 		<KeyboardAwareScrollView
 			bottomOffset={50}
 			enableOnAndroid={true}
-			contentContainerStyle={styles.content}
+			contentContainerStyle={{ flexGrow: 1 }}
 		>
 			<LinearGradient
 				style={styles.container}
-				colors={['#6A266F', '#00B7FF', '#6A266F']}
+				colors={colorStyle.mainGradient}
 			>
-				<View style={styles.imageContainer}>
+				<View style={styles.card}>
 					<Image
 						source={require("./../../assets/logoconfondo-remove.png")}
 						style={styles.logo}
 					/>
-				</View>
 
-				<View style={styles.inputContainer}>
+					<Text style={textStyle.title}>Inicia sesión</Text>
+
 					{errors.general ? (
 						<Text style={styles.errorGeneral}>{errors.general}</Text>
 					) : null}
@@ -118,26 +170,42 @@ const LoginScreen = ({ navigation }) => {
 					</TouchableOpacity>
 
 					<Pressable
-						style={({ pressed }) => [
-							styles.button,
-							pressed && styles.buttonPressed,
-							isLoading && styles.buttonDisabled
-						]}
+						style={[styles.button, isLoading && styles.buttonDisabled]}
 						onPress={submitForm}
 						disabled={isLoading}
+						onPressIn={handleLoginPressIn}
+						onPressOut={handleLoginPressOut}
 					>
-						{isLoading ? (
-							<ActivityIndicator color="#fff" size="small" />
-						) : (
-							<Text style={styles.buttonText}>Iniciar sesión</Text>
-						)}
+						<Animated.View style={{ transform: [{ scale: loginScaleAnim }] }}>
+							{isLoading ? (
+								<ActivityIndicator color="#fff" size="small" />
+							) : (
+								<Text style={styles.buttonText}>Iniciar sesión</Text>
+							)}
+						</Animated.View>
 					</Pressable>
 
-					<TouchableOpacity onPress={handleRegister}>
-						<Text style={textStyle.text}>
-							No tienes cuenta, <Text style={styles.link}>regístrate</Text>
-						</Text>
-					</TouchableOpacity>
+					<Pressable
+						onPress={handleRegister}
+						onPressIn={handleRegisterPressIn}
+						onPressOut={handleRegisterPressOut}
+						style={styles.linkButton}
+					>
+						<Animated.View style={{ transform: [{ scale: registerScaleAnim }] }}>
+							<Text style={styles.buttonText}>Regístrate</Text>
+						</Animated.View>
+					</Pressable>
+
+					<Pressable
+						onPress={handleGuest}
+						onPressIn={handleGuestPressIn}
+						onPressOut={handleGuestPressOut}
+						style={styles.guestButton}
+					>
+						<Animated.View style={{ transform: [{ scale: guestScaleAnim }] }}>
+							<Text style={styles.guestButtonText}>Continuar como invitado</Text>
+						</Animated.View>
+					</Pressable>
 				</View>
 			</LinearGradient>
 		</KeyboardAwareScrollView>
@@ -145,61 +213,50 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	content: {
-		width: '100%',
-		height: height * 1.20
-	},
 	container: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
 		padding: 16,
 	},
-	inputContainer: {
-		justifyContent: 'center',
-		alignItems: 'center',
+	card: {
+		backgroundColor: colorStyle.bgCard,
 		borderRadius: 20,
-		padding: 20,
-		width: '100%'
-	},
-	link: {
-		color: '#007BFF',
-		textDecorationLine: 'underline',
-		marginTop: 40,
+		padding: 24,
+		width: '100%',
+		maxWidth: 400,
+		alignItems: 'center',
 	},
 	logo: {
-		width: 450,
-		height: 450,
-		resizeMode: 'contain',
-	},
-	imageContainer: {
-		justifyContent: 'center',
-		alignItems: 'center',
 		width: 200,
 		height: 200,
+		resizeMode: 'contain',
+		marginBottom: 8,
 	},
 	button: {
-		backgroundColor: '#00B7FF',
-		paddingVertical: 12,
-		paddingHorizontal: 32,
-		borderRadius: 10,
+		backgroundColor: colorStyle.mainGradient[0],
+		borderRadius: defaultBRadius,
+		padding: 14,
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginTop: 10,
-		marginBottom: 20,
-		minWidth: 180,
-		minHeight: 44,
-	},
-	buttonPressed: {
-		opacity: 0.8,
+		minHeight: 48,
+		marginVertical: 10,
+		width: '100%',
+		maxWidth: 150,
 	},
 	buttonDisabled: {
 		opacity: 0.6,
 	},
 	buttonText: {
-		color: '#fff',
 		fontSize: 16,
-		fontWeight: 'bold',
+		color: colorStyle.textPrimary,
+		textAlign: 'center',
+	},
+	linkButton: {
+		padding: 8,
+		marginTop: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	errorText: {
 		color: '#FF3B30',
@@ -218,12 +275,29 @@ const styles = StyleSheet.create({
 		width: '90%',
 		textAlign: 'center',
 		marginBottom: 10,
+		alignSelf: 'center',
 	},
 	showPassword: {
-		color: '#007BFF',
+		color: colorStyle.textSecondary,
 		fontSize: 13,
 		marginTop: -4,
 		marginBottom: 8,
+	},
+	guestButton: {
+		padding: 10,
+		marginTop: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: colorStyle.textSecondary,
+		borderRadius: defaultBRadius,
+		width: '100%',
+		maxWidth: 220,
+	},
+	guestButtonText: {
+		fontSize: 14,
+		color: colorStyle.textSecondary,
+		textAlign: 'center',
 	},
 });
 

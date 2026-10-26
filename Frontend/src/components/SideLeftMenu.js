@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, Pressable, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { textStyle } from '../styles/TextStyles';
 import { colorStyle } from '../styles/Colors';
@@ -9,7 +9,7 @@ import { User } from '../contexts/UserContext';
 const { width } = Dimensions.get('window');
 const menuWidth = 250;
 
-const SideLeftMenu = ({ slideAnim }) => {
+const SideLeftMenu = ({ slideAnim, menuOpen, closeMenu }) => {
     const { user, logout } = useContext(User);
 
     async function logOut() {
@@ -17,24 +17,34 @@ const SideLeftMenu = ({ slideAnim }) => {
     }
 
     return (
-        <Animated.View style={[styles.sideMenu, { left: slideAnim }]}>
-            <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>Botón 1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>Botón 2</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>Botón 3</Text>
-            </TouchableOpacity>
-            {/* Log Out Button */}
-            <Pressable onPress={logOut} style={({ pressed }) => [
-                buttonStyles.logOutButton,
-                pressed && buttonStyles.logOutButtonPressed
-            ]}>
-                <Text style={textStyle.button}>Cerrar sesión</Text>
-            </Pressable>
-        </Animated.View>
+        <Modal
+            visible={menuOpen}
+            transparent
+            animationType="none"
+            onRequestClose={closeMenu}
+        >
+            <TouchableWithoutFeedback onPress={closeMenu}>
+                <View style={styles.overlay} />
+            </TouchableWithoutFeedback>
+            <Animated.View style={[styles.sideMenu, { left: slideAnim }]}>
+                <TouchableOpacity style={styles.menuItem}>
+                    <Text style={styles.menuText}>Botón 1</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem}>
+                    <Text style={styles.menuText}>Botón 2</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem}>
+                    <Text style={styles.menuText}>Botón 3</Text>
+                </TouchableOpacity>
+                {/* Log Out Button */}
+                <Pressable onPress={logOut} style={({ pressed }) => [
+                    buttonStyles.logOutButton,
+                    pressed && buttonStyles.logOutButtonPressed
+                ]}>
+                    <Text style={textStyle.button}>Cerrar sesión</Text>
+                </Pressable>
+            </Animated.View>
+        </Modal>
     );
 };
 
@@ -70,16 +80,16 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.3)',
         zIndex: 1,
     },
-    sideMenu: {
+	sideMenu: {
         position: 'absolute',
         top: 0,
         bottom: 0,
         width: menuWidth,
-        backgroundColor: '#fff',
+        backgroundColor: colorStyle.bgDark,
         paddingTop: 80,
         paddingHorizontal: 20,
-        zIndex: 4,
-        elevation: 5,
+        zIndex: 200,
+        elevation: 200,
         shadowColor: '#000',
         shadowOpacity: 0.3,
         shadowOffset: { width: 2, height: 0 },
@@ -90,11 +100,12 @@ const styles = StyleSheet.create({
     menuItem: {
         paddingVertical: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderBottomColor: colorStyle.bgCard,
     },
     menuText: {
         fontSize: 18,
-        fontFamily: "main-font"
+        fontFamily: "main-font",
+        color: colorStyle.textPrimary,
     },
     content: {
         flex: 1,

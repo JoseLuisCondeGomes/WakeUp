@@ -1,20 +1,53 @@
-import { Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { useRef } from 'react';
+import { Text, TouchableOpacity, StyleSheet, Dimensions, Animated, View } from 'react-native';
+import { colorStyle } from '../styles/Colors';
 
 const { width } = Dimensions.get('window');
 
-const DayCard = ({ day, isSelected, onPress }) => (
-    <TouchableOpacity
-        onPress={() => onPress(day)}
-        style={[styles.card, isSelected && styles.cardSelected]}
-    >
-        <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
-            {day.format('DD')}
-        </Text>
-        <Text style={[styles.weekdayText, isSelected && styles.dayTextSelected]}>
-            {day.format('ddd')}
-        </Text>
-    </TouchableOpacity>
-);
+const DayCard = ({ day, isSelected, onPress, compact, isToday, activity }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.9,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 3,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    return (
+        <TouchableOpacity
+            onPress={() => onPress(day)}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={1}
+        >
+            <Animated.View
+                style={[styles.card, compact && styles.cardCompact, isSelected && styles.cardSelected, isToday && !isSelected && styles.cardToday, { transform: [{ scale: scaleAnim }] }]}
+            >
+                <Text style={[styles.dayText, compact && styles.dayTextCompact, isSelected && styles.dayTextSelected]}>
+                    {day.format('DD')}
+                </Text>
+                <Text style={[styles.weekdayText, compact && styles.weekdayTextCompact, isSelected && styles.dayTextSelected]}>
+                    {day.format('ddd')}
+                </Text>
+                {activity && (activity.hasExercise || activity.hasFood) && (
+                    <View style={styles.dotContainer}>
+                        {activity.hasExercise && <View style={[styles.dotHalf, styles.dotExercise]} />}
+                        {activity.hasFood && <View style={[styles.dotHalf, styles.dotFood]} />}
+                    </View>
+                )}
+            </Animated.View>
+        </TouchableOpacity>
+    );
+};
 
 export default DayCard;
 
@@ -23,12 +56,12 @@ const styles = StyleSheet.create({
         width: width * 0.18,
         height: 80,
         borderRadius: 16,
-        backgroundColor: '#fff',
-        marginHorizontal: 6,
+        backgroundColor: colorStyle.bgDark,
+        marginHorizontal: 4,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderColor: colorStyle.bgCard,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.08,
@@ -36,18 +69,50 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     cardSelected: {
-        backgroundColor: '#3a8abb',
+        backgroundColor: colorStyle.mainGradient[0],
+    },
+    cardToday: {
+        borderWidth: 2,
+        borderColor: colorStyle.mainGradient[0],
+    },
+    cardCompact: {
+        width: width * 0.09,
+        height: 60,
+        marginHorizontal: 3,
     },
     dayText: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#333',
+        color: colorStyle.textPrimary,
+    },
+    dayTextCompact: {
+        fontSize: 16,
     },
     weekdayText: {
         fontSize: 14,
-        color: '#888',
+        color: colorStyle.textMuted,
+    },
+    weekdayTextCompact: {
+        fontSize: 11,
     },
     dayTextSelected: {
-        color: '#fff',
+        color: colorStyle.textPrimary,
+    },
+    dotContainer: {
+        flexDirection: 'row',
+        position: 'absolute',
+        bottom: 6,
+        gap: 2,
+    },
+    dotHalf: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    dotExercise: {
+        backgroundColor: '#4CAF50',
+    },
+    dotFood: {
+        backgroundColor: '#FF9800',
     },
 });

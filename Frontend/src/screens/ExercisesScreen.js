@@ -4,11 +4,12 @@ import {
     Text,
     StyleSheet,
     Dimensions,
-    TouchableOpacity
+    Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colorStyle } from '../styles/Colors';
-import { DaysCarousel } from '../components/DaysCarousel';
+import { CalendarComponent } from '../components/CalendarComponent';
+import { CathegoriesDropdown } from '../components/CathegoriesDropdown';
 import { defaultBRadius } from '../styles/DefaultVaules';
 import AddDataModal from '../components/Modals/AddDataModal';
 import { User } from '../contexts/UserContext';
@@ -18,17 +19,17 @@ import ExerciseModalScreen from './ExerciseModalScreen';
 import AddButton from '../components/AddButton';
 
 const { width } = Dimensions.get('window');
-const menuWidth = 250;
 
 const ExercisesScreen = ({ navigation }) => {
     // States:
-    const { user, token } = useContext(User);
+    const { user, token, isGuest } = useContext(User);
     const [selectedDate, setSelectedDate] = useState(null);
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [cardioExercises, setCardioExercises] = useState(null);
     const [strenghtExercises, setStrenghtExercises] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState(null);
 
     function handleOpenModal(exercise) {
         setSelectedExercise(exercise);
@@ -50,17 +51,40 @@ const ExercisesScreen = ({ navigation }) => {
         getExercises();
     }
 
+    function groupByCathegory(exercises) {
+        const grouped = {};
+        exercises.forEach(ex => {
+            const key = ex.cathegoryName || "Uncategorized";
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(ex);
+        });
+        return grouped;
+    }
+
     async function getExercises() {
         try {
             if (selectedDate != null) {
-                const response = await apiService.getCardioExercisesInDate(selectedDate.format('YYYY-MM-DD'), user.uuidUser, token);
-                const responseStrenghtExercises = await apiService.getStrengthExercisesInDate(selectedDate.format('YYYY-MM-DD'), user.uuidUser, token);
+                const response = await apiService.getCardioExercisesInDate(selectedDate.format('YYYY-MM-DD'), user.uuidUser, token, isGuest);
+                const responseStrenghtExercises = await apiService.getStrengthExercisesInDate(selectedDate.format('YYYY-MM-DD'), user.uuidUser, token, isGuest);
                 setCardioExercises(response);
                 setStrenghtExercises(responseStrenghtExercises);
+                return { cardio: response, strength: responseStrenghtExercises };
             }
         } catch (error) {
-            // TODO: add conditionals for the diferents use cases if the user don't work
             console.error(error);
+        }
+        return null;
+    }
+
+    async function refreshSelectedExercise() {
+        const data = await getExercises();
+        if (selectedExercise && data) {
+            const allExercises = [
+                ...(data.cardio || []),
+                ...(data.strength || [])
+            ];
+            const updated = allExercises.find(ex => ex.uuidExercise === selectedExercise.uuidExercise);
+            if (updated) setSelectedExercise(updated);
         }
     }
 
@@ -73,28 +97,44 @@ const ExercisesScreen = ({ navigation }) => {
             style={styles.mainContainer}
             colors={colorStyle.mainGradient}
         >
-            <DaysCarousel setSelectedDate={setSelectedDate} />
-            <View style={styles.exercisesContainer}>
-                {
-                    cardioExercises != null ?
-                        cardioExercises.map(
-                            (exercise) => <TrainingTab key={exercise.uuidExercise} data={exercise} onPress={() => handleOpenModal(exercise)} />
-                        )
-                        :
-                        ""
-                }
-                {
-                    strenghtExercises != null ?
-                        strenghtExercises.map(
-                            (exercise) => <TrainingTab key={exercise.uuidExercise} data={exercise} onPress={() => handleOpenModal(exercise)} />
-                        )
-                        :
-                        ""
-                }
+            <View style={Platform.OS === 'web' ? styles.webRow : styles.mobileColumn}>
+                <View style={Platform.OS === 'web' ? styles.calendarColumn : null}>
+                    <CalendarComponent setSelectedDate={setSelectedDate} />
+                </View>
+                <View style={Platform.OS === 'web' ? styles.exercisesColumn : styles.exercisesContainer}>
+                    <CathegoriesDropdown onCategorySelect={setSelectedCategory} selectedCategory={selectedCategory} />
+
+                    {
+                        cardioExercises != null && !selectedCategory ?
+                            cardioExercises.map(
+                                (exercise) => <TrainingTab key={exercise.uuidExercise} data={exercise} onPress={() => handleOpenModal(exercise)} />
+                            )
+                            :
+                            ""
+                    }
+                    {
+                        strenghtExercises != null ?
+                            Object.entries(
+                                groupByCathegory(
+                                    selectedCategory
+                                        ? strenghtExercises.filter(ex => ex.cathegoryName === selectedCategory.cathegory_name)
+                                        : strenghtExercises
+                                )
+                            ).map(([cathegory, exercises]) => (
+                                <View key={cathegory} style={styles.cathegoryGroup}>
+                                    <Text style={styles.cathegoryGroupTitle}>{cathegory}</Text>
+                                    {exercises.map(exercise => (
+                                        <TrainingTab key={exercise.uuidExercise} data={exercise} onPress={() => handleOpenModal(exercise)} />
+                                    ))}
+                                </View>
+                            ))
+                            :
+                            ""
+                    }
+                </View>
             </View>
 
-
-            {/* Button to open the modal */}
+            {/* Button to open the add modal */}
             <AddButton onOpen={openTabToAddExercise} />
 
             {/* Modal to add exercises: */}
@@ -104,6 +144,16 @@ const ExercisesScreen = ({ navigation }) => {
                 date={selectedDate}
                 screen={"Exercises"}
             />
+
+            {/* Modal to view exercise details: */}
+            <ExerciseModalScreen
+                isVisible={modalVisible}
+                onClose={handleCloseModal}
+                exercise={selectedExercise}
+                onDelete={refreshSelectedExercise}
+            />
+
+
         </LinearGradient>
     );
 };
@@ -116,29 +166,39 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         alignItems: 'center',
         padding: 16,
+        paddingBottom: 155,
     },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        top: 50
+    webRow: {
+        flex: 1,
+        flexDirection: 'row',
+        width: '100%',
+        maxWidth: 1200,
+        gap: 24,
     },
-    addButton: {
-        position: 'absolute',
-        bottom: 140,
-        right: 20,
-        zIndex: 3,
-        backgroundColor: '#ddd',
-        width: 50,
-        height: 50,
-        borderRadius: defaultBRadius,
+    mobileColumn: {
+        width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
     },
-    buttonText: {
-        fontSize: 24,
-        fontWeight: 'bold'
+    calendarColumn: {
+        flex: 0.4,
+        maxWidth: 420,
+    },
+    exercisesColumn: {
+        flex: 0.6,
     },
     exercisesContainer: {
-        width: width * 0.90
-    }
+        width: width * 0.90,
+        alignItems: 'center',
+    },
+    cathegoryGroup: {
+        width: '100%',
+        marginTop: 8,
+    },
+    cathegoryGroupTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: colorStyle.textPrimary,
+        marginLeft: 8,
+        marginBottom: 4,
+    },
 });

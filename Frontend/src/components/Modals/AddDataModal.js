@@ -2,6 +2,7 @@ import { View, StyleSheet, Dimensions, Text } from "react-native";
 import Modal from 'react-native-modal';
 import AddExerciseDataModal from "./AddExerciseDataModal";
 import AddFoodDataModal from "./AddFoodDataModal";
+import { colorStyle } from "../../styles/Colors";
 
 const { height } = Dimensions.get('window');
 
@@ -13,8 +14,9 @@ export default function AddDataModal({ isVisible, onClose, date, screen }) {
              onSwipeComplete={onClose}
              swipeDirection="down"
              style={styles.modalContainer}
-             backdropTransitionOutTiming={0}
-             useNativeDriverForBackdrop
+             avoidKeyboard={true}
+             useNativeDriver={false}
+             propagateSwipe={true}
          >
              <View style={styles.modalContent}>
                  <View style={styles.modalHandle} />
@@ -39,7 +41,7 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         height: height * 0.85,
-        backgroundColor: 'rgba(255, 255, 255, 0.91)',
+        backgroundColor: colorStyle.bgDark,
         borderTopLeftRadius: 25,
         borderTopRightRadius: 25,
         padding: 20,
@@ -49,14 +51,15 @@ const styles = StyleSheet.create({
     modalHandle: {
         width: 40,
         height: 5,
-        backgroundColor: '#ccc',
+        backgroundColor: colorStyle.textInactive,
         borderRadius: 2.5,
         marginBottom: 10,
     },
     modalTitle: {
         fontSize: 22,
         marginBottom: 10,
-        fontFamily: "main-font"
+        fontFamily: "main-font",
+        color: colorStyle.textPrimary,
     },
     modalSubtitle: {
         fontSize: 18,

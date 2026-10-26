@@ -3,11 +3,12 @@ import { Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/Register';
-import HomeScreen from '../screens/HomeScreen';
+import RegisterScreen from '../screens/RegisterScreen/RegisterScreen';
+import HomeScreen from '../screens/HomeScreen/HomeScreen';
 import { User } from '../contexts/UserContext';
 import ExercisesScreen from '../screens/ExercisesScreen';
 import FeedingScreen from '../screens/FeedingScreen';
+import OptionsScreen from '../screens/OptionsScreen';
 import NavigationBar from '../components/NavigationBar';
 import { runnigInBrowser } from '../utilities/defineConfig';
 
@@ -27,6 +28,7 @@ function MainTabs() {
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Exercises" component={ExercisesScreen} />
             <Tab.Screen name="Feeding" component={FeedingScreen} />
+            <Tab.Screen name="Options" component={OptionsScreen} />
         </Tab.Navigator>
     );
 }

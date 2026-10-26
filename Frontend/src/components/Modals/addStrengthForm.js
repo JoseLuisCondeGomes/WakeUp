@@ -1,16 +1,32 @@
 import { useContext, useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, Text, View } from "react-native";
+import { StyleSheet, TouchableOpacity, Text, View, ScrollView, ActivityIndicator, TextInput } from "react-native";
 import InputField from "../InputField";
 import * as apiService from "./../../services/exerciseService";
+import * as cathegoryService from "./../../services/cathegoryService";
+import * as presetService from "./../../services/exercisePresetService";
 import { User } from '../../contexts/UserContext';
 import { colorStyle } from "../../styles/Colors";
 
 export default function AddStrengthForm({ date }) {
-    const { user, token } = useContext(User);
+    const { user, token, isGuest } = useContext(User);
+    const [cathegories, setCathegories] = useState([]);
+    const [step, setStep] = useState('category');
+    const [selectedCathegory, setSelectedCathegory] = useState(null);
+    const [presets, setPresets] = useState([]);
+    const [loadingPresets, setLoadingPresets] = useState(false);
+    const [showAddCategory, setShowAddCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [addingCategory, setAddingCategory] = useState(false);
+    const [existingSets, setExistingSets] = useState([]);
+    const [loadingSets, setLoadingSets] = useState(false);
+    const [editingSetUuid, setEditingSetUuid] = useState(null);
+    const [editWeight, setEditWeight] = useState('');
+    const [editRepeats, setEditRepeats] = useState('');
     const [exerciseData, setExerciseData] = useState({
         exerciseUser: "",
         exerciseName: "",
         exerciseDate: "",
+        uuidCathegory: "",
         set: {
             setNumber: 1,
             setWeight: "",
@@ -29,13 +45,102 @@ export default function AddStrengthForm({ date }) {
         }));
     }
 
-    async function submitForm() {
+    async function handleAddCategory() {
+        const name = newCategoryName.trim();
+        if (!name) return;
+        setAddingCategory(true);
         try {
-            const response = await apiService.addStrengthExecise(exerciseData, token);
-            if (response.ok) {
+            await cathegoryService.addCathegory(name, token, isGuest);
+            setNewCategoryName('');
+            setShowAddCategory(false);
+            const updated = await cathegoryService.getCathegories(token, isGuest);
+            setCathegories(updated);
+            const newCat = updated.find(c => c.cathegory_name === name);
+            if (newCat) {
+                handleCategorySelect(newCat);
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setAddingCategory(false);
+        }
+    }
+
+    async function loadExistingSets() {
+        setLoadingSets(true);
+        try {
+            const data = await apiService.getExerciseSetsByName(
+                exerciseData.exerciseDate,
+                exerciseData.exerciseUser,
+                exerciseData.exerciseName,
+                token,
+                isGuest
+            );
+            if (data) {
+                setExistingSets(data.sets);
                 setExerciseData(prev => ({
                     ...prev,
-                    set: { setNumber: prev.set.setNumber + 1, setWeight: "", setRepeats: "" }
+                    set: { ...prev.set, setNumber: data.sets.length + 1 }
+                }));
+            } else {
+                setExistingSets([]);
+                setExerciseData(prev => ({
+                    ...prev,
+                    set: { ...prev.set, setNumber: 1 }
+                }));
+            }
+        } catch (error) {
+            console.error(error);
+            setExistingSets([]);
+        } finally {
+            setLoadingSets(false);
+        }
+    }
+
+    function handleStartEdit(set) {
+        setEditingSetUuid(set.uuid_exercise_set);
+        setEditWeight(String(set.weight));
+        setEditRepeats(String(set.repeats));
+    }
+
+    function handleCancelEdit() {
+        setEditingSetUuid(null);
+        setEditWeight('');
+        setEditRepeats('');
+    }
+
+    async function handleSaveEdit(uuid) {
+        try {
+            await apiService.updateExerciseSet(uuid, {
+                weight: parseFloat(editWeight),
+                repeats: parseInt(editRepeats, 10)
+            }, token, isGuest);
+            setEditingSetUuid(null);
+            setEditWeight('');
+            setEditRepeats('');
+            await loadExistingSets();
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function handleDeleteSet(uuid) {
+        try {
+            await apiService.deleteExerciseSet(uuid, token, isGuest);
+            await loadExistingSets();
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function submitForm() {
+        try {
+            const response = await apiService.addStrengthExecise(exerciseData, token, isGuest);
+            if (response.ok) {
+                await loadExistingSets();
+                setExerciseData(prev => ({
+                    ...prev,
+                    set: { ...prev.set, setWeight: "", setRepeats: "" }
                 }));
             }
         } catch (error) {
@@ -43,13 +148,142 @@ export default function AddStrengthForm({ date }) {
         }
     }
 
+    async function handleCategorySelect(cat) {
+        setSelectedCathegory(cat);
+        handleInputChange("uuidCathegory", cat.uuid_cathegory);
+        setStep('presets');
+        setLoadingPresets(true);
+        try {
+            const data = await presetService.getPresets("strength", cat.uuid_cathegory, user.uuidUser, token, isGuest);
+            setPresets(data);
+        } catch (error) {
+            console.error(error);
+            setPresets([]);
+        } finally {
+            setLoadingPresets(false);
+        }
+    }
+
+    function handlePresetSelect(preset) {
+        handleInputChange("exerciseName", preset.exercise_name);
+        setStep('details');
+    }
+
+    function handleCustomExercise() {
+        handleInputChange("exerciseName", "");
+        setStep('details');
+    }
+
     useEffect(() => {
         handleInputChange("exerciseDate", date.format('DD-MM-YYYY'));
         handleInputChange("exerciseUser", user.uuidUser);
+        cathegoryService.getCathegories(token, isGuest)
+            .then(setCathegories)
+            .catch(console.error);
     }, []);
+
+    useEffect(() => {
+        if (step === 'details' && exerciseData.exerciseName) {
+            loadExistingSets();
+        }
+    }, [step, exerciseData.exerciseName]);
+
+    if (step === 'category') {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.stepTitle}>Select a category</Text>
+                <ScrollView style={styles.pickerList}>
+                    {cathegories.map((cat) => (
+                        <TouchableOpacity
+                            key={cat.uuid_cathegory}
+                            style={styles.pickerItem}
+                            onPress={() => handleCategorySelect(cat)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.pickerItemText}>{cat.cathegory_name}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+                <View style={styles.addCategorySection}>
+                    {showAddCategory ? (
+                        <View style={styles.addCategoryRow}>
+                            <TextInput
+                                style={styles.addCategoryInput}
+                                value={newCategoryName}
+                                onChangeText={setNewCategoryName}
+                                placeholder="Category name"
+                                placeholderTextColor={colorStyle.textInactive}
+                                autoFocus
+                            />
+                            <TouchableOpacity
+                                style={styles.addCategoryConfirmBtn}
+                                onPress={handleAddCategory}
+                                disabled={addingCategory}
+                            >
+                                <Text style={styles.addCategoryConfirmText}>{addingCategory ? "..." : "Add"}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.addCategoryCancelBtn}
+                                onPress={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                            >
+                                <Text style={styles.addCategoryCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.addCategoryButton} onPress={() => setShowAddCategory(true)}>
+                            <Text style={styles.addCategoryButtonText}>+ Add category</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+        );
+    }
+
+    if (step === 'presets') {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity onPress={() => setStep('category')} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>{"< Back"}</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepTitle}>
+                    {selectedCathegory ? selectedCathegory.cathegory_name : ""} exercises
+                </Text>
+                {loadingPresets ? (
+                    <ActivityIndicator size="large" color={colorStyle.mainGradient[0]} />
+                ) : (
+                    <ScrollView style={styles.pickerList}>
+                        {presets.length > 0 ? (
+                            presets.map((preset) => (
+                                <TouchableOpacity
+                                    key={preset.uuid_exercise_preset}
+                                    style={styles.pickerItem}
+                                    onPress={() => handlePresetSelect(preset)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.pickerItemText}>{preset.exercise_name}</Text>
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <Text style={styles.emptyText}>No hay ejercicios de esta categoría disponibles</Text>
+                        )}
+                        <TouchableOpacity
+                            style={[styles.customButton, { backgroundColor: colorStyle.mainGradient[1] }]}
+                            onPress={handleCustomExercise}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.customButtonText}>Custom exercise</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                )}
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
+            <TouchableOpacity onPress={() => setStep('presets')} style={styles.backButton}>
+                <Text style={styles.backButtonText}>{"< Back"}</Text>
+            </TouchableOpacity>
             <View style={styles.formContainer}>
                 <InputField
                     label="Exercise name"
@@ -58,6 +292,62 @@ export default function AddStrengthForm({ date }) {
                     keyboardType="text-pad"
                     centered={true}
                 />
+
+                {loadingSets ? (
+                    <ActivityIndicator size="small" color={colorStyle.mainGradient[0]} style={{ marginTop: 16 }} />
+                ) : existingSets.length > 0 ? (
+                    <View style={styles.existingSetsSection}>
+                        <Text style={styles.sectionLabel}>Existing sets</Text>
+                        <ScrollView style={styles.existingSetsList}>
+                            {existingSets.map((s) => (
+                                <View key={s.uuid_exercise_set} style={styles.existingSetRow}>
+                                    {editingSetUuid === s.uuid_exercise_set ? (
+                                        <>
+                                            <Text style={styles.setNumberLabel}>Set {s.set_number}</Text>
+                                            <TextInput
+                                                style={styles.editInput}
+                                                value={editWeight}
+                                                onChangeText={setEditWeight}
+                                                keyboardType="number-pad"
+                                                placeholder="kg"
+                                                placeholderTextColor={colorStyle.textInactive}
+                                            />
+                                            <TextInput
+                                                style={styles.editInput}
+                                                value={editRepeats}
+                                                onChangeText={setEditRepeats}
+                                                keyboardType="number-pad"
+                                                placeholder="reps"
+                                                placeholderTextColor={colorStyle.textInactive}
+                                            />
+                                            <TouchableOpacity
+                                                style={styles.editConfirmBtn}
+                                                onPress={() => handleSaveEdit(s.uuid_exercise_set)}
+                                            >
+                                                <Text style={styles.editConfirmText}>OK</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.editCancelBtn} onPress={handleCancelEdit}>
+                                                <Text style={styles.editCancelText}>X</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.setNumberLabel}>Set {s.set_number}</Text>
+                                            <Text style={styles.existingSetText}>{s.weight} kg</Text>
+                                            <Text style={styles.existingSetText}>{s.repeats} reps</Text>
+                                            <TouchableOpacity style={styles.editBtn} onPress={() => handleStartEdit(s)}>
+                                                <Text style={styles.editBtnText}>Edit</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteSet(s.uuid_exercise_set)}>
+                                                <Text style={styles.deleteBtnText}>Del</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                ) : null}
 
                 <Text style={styles.sectionLabel}>Set {exerciseData.set.setNumber}</Text>
                 <View style={styles.row}>
@@ -103,10 +393,113 @@ const styles = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
     },
+    stepTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: colorStyle.textPrimary,
+        marginBottom: 16,
+    },
+    backButton: {
+        alignSelf: 'flex-start',
+        marginLeft: 16,
+        marginBottom: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    backButtonText: {
+        color: colorStyle.mainGradient[0],
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    pickerList: {
+        width: '85%',
+        maxHeight: 300,
+    },
+    pickerItem: {
+        backgroundColor: colorStyle.mainGradient[0] + '30',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 8,
+    },
+    pickerItemText: {
+        color: colorStyle.textPrimary,
+        fontSize: 16,
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    customButton: {
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginTop: 8,
+        alignItems: 'center',
+    },
+    customButtonText: {
+        color: colorStyle.textPrimary,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    emptyText: {
+        color: colorStyle.textInactive,
+        fontSize: 14,
+        textAlign: 'center',
+        paddingVertical: 20,
+        fontStyle: 'italic',
+    },
+    addCategorySection: {
+        width: '85%',
+        marginTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: colorStyle.mainGradient[0] + '40',
+        paddingTop: 8,
+    },
+    addCategoryButton: {
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    addCategoryButtonText: {
+        color: colorStyle.mainGradient[0],
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    addCategoryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    addCategoryInput: {
+        flex: 1,
+        height: 36,
+        backgroundColor: colorStyle.bgCard,
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        fontSize: 14,
+        color: colorStyle.textPrimary,
+    },
+    addCategoryConfirmBtn: {
+        backgroundColor: colorStyle.mainGradient[0],
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+    },
+    addCategoryConfirmText: {
+        color: colorStyle.textPrimary,
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    addCategoryCancelBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+    },
+    addCategoryCancelText: {
+        color: colorStyle.textInactive,
+        fontSize: 13,
+    },
     sectionLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#888',
+        color: colorStyle.textMuted,
         textTransform: 'uppercase',
         letterSpacing: 1,
         alignSelf: 'flex-start',
@@ -135,86 +528,87 @@ const styles = StyleSheet.create({
     saveButtonText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: colorStyle.textPrimary,
+    },
+    existingSetsSection: {
+        width: '85%',
+        marginTop: 8,
+    },
+    existingSetsList: {
+        maxHeight: 180,
+    },
+    existingSetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colorStyle.mainGradient[0] + '30',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        marginBottom: 6,
+        gap: 8,
+    },
+    setNumberLabel: {
+        color: colorStyle.textMuted,
+        fontSize: 13,
+        fontWeight: '600',
+        minWidth: 38,
+    },
+    existingSetText: {
+        color: colorStyle.textPrimary,
+        fontSize: 14,
+        flex: 1,
+        textAlign: 'center',
+    },
+    editBtn: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        backgroundColor: colorStyle.mainGradient[0] + '60',
+    },
+    editBtnText: {
+        color: colorStyle.textPrimary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    deleteBtn: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        backgroundColor: '#a03030',
+    },
+    deleteBtnText: {
+        color: colorStyle.textPrimary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    editInput: {
+        flex: 1,
+        height: 32,
+        backgroundColor: colorStyle.bgCard,
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        fontSize: 13,
+        color: colorStyle.textPrimary,
+        textAlign: 'center',
+    },
+    editConfirmBtn: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        backgroundColor: colorStyle.mainGradient[0],
+    },
+    editConfirmText: {
+        color: colorStyle.textPrimary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    editCancelBtn: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    editCancelText: {
+        color: colorStyle.textInactive,
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
-
-/*
-    return (
-        <KeyboardAwareScrollView
-            bottomOffset={50}
-            enableOnAndroid={true}
-            contentContainerStyle={styles.content}
-        >
-            <View style={styles.container}>
-                <InputField
-                    label="Exercise name:"
-                    value={exerciseData.exerciseName}
-                    onChangeText={(text) => handleInputChange("exerciseName", text)}
-                    keyboardType="text-pad"
-                />
-
-                <WorkoutSwitch
-                    exerciseType={exerciseData.exerciseType}
-                    setExerciseType={(value) => handleInputChange('exerciseType', value)}
-                />
-
-                {
-                    exerciseData.exerciseType ?
-                        // Strenght Input
-                        <InputField
-                            label="Weight:"
-                            value={exerciseData.exerciseWeight}
-                            onChangeText={(text) => handleInputChange("exerciseWeight", text)}
-                            keyboardType="phone-pad"
-                        />
-                        :
-                        // Cardio Input
-                        <InputField
-                            label="Time:"
-                            value={exerciseData.exerciseTime}
-                            onChangeText={(text) => handleInputChange("exerciseTime", text)}
-                            keyboardType="text-pad"
-                        />
-                }
-
-                {
-                    exerciseData.exerciseType ?
-                        <InputField
-                            label="Repeats:"
-                            value={exerciseData.exerciseRepeats}
-                            onChangeText={(text) => handleInputChange("exerciseRepeats", text)}
-                            keyboardType="phone-pad"
-                        />
-                        :
-                        <InputField
-                            label="Distance:"
-                            value={exerciseData.exerciseDistance}
-                            onChangeText={(text) => handleInputChange("exerciseDistance", text)}
-                            keyboardType="phone-pad"
-                        />
-                }
-
-                {
-                    exerciseData.exerciseType ?
-                        null
-                        :
-                        <InputField
-                            label="Intensity:"
-                            value={exerciseData.exerciseIntensity}
-                            onChangeText={(text) => handleInputChange("exerciseIntensity", text)}
-                            keyboardType="phone-pad"
-                        />
-                }
-                {
-                    exerciseData.exerciseType ? <SavedSetInfoDisplay /> : null
-                }
-                <TouchableOpacity style={styles.addButton} onPress={submitForm}>
-                    <Text style={styles.buttonText}>ADD</Text>
-                </TouchableOpacity>
-
-            </View>
-        </KeyboardAwareScrollView>
-
-    );
-*/

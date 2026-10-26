@@ -45,9 +45,9 @@ export default NavigationBar;
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        backgroundColor: '#fff',
+        backgroundColor: colorStyle.bgDark,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: colorStyle.bgCard,
         ...Platform.select({
             web: {
                 position: 'sticky',
